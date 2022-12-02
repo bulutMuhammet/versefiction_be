@@ -12,7 +12,7 @@ class Profile(models.Model):
     GENDER       = (('e', 'Erkek'), ('k', 'Kadın'), ('d', 'Diğer'))
 
     user         = models.OneToOneField(User, related_name="profile", verbose_name="Kullanıcı", on_delete=models.CASCADE)
-    photo        = models.FileField(upload_to='user_photos',blank=False,null=False, verbose_name="Fotoğraf")
+    photo        = models.ImageField(upload_to='user_photos',blank=True,null=True, verbose_name="Fotoğraf")
     gender       = models.CharField(choices=GENDER,blank=True, null=True, max_length=15, verbose_name='Cinsiyet')
     birth_date   = models.DateField(blank=True, null=True, verbose_name="Doğum Tarihi")
     bio          = models.TextField(blank=True, null=True, verbose_name="Hakkımda")

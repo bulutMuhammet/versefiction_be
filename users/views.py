@@ -1,32 +1,26 @@
+# Sadece başaracağım günü bekliyorum.
+# Beklemekten öte
+
 from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.models import User
 from django.core.mail import send_mail
-from django.shortcuts import render
-
-# Create your views here.
-from django.template.loader import render_to_string
-from django.utils.encoding import force_text, force_bytes
+from django.utils.encoding import force_str, force_bytes
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from rest_framework import status
-from rest_framework.authentication import SessionAuthentication
-from rest_framework.generics import CreateAPIView, UpdateAPIView, DestroyAPIView, \
-    get_object_or_404
+from rest_framework.generics import CreateAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenViewBase
-
-from users.models import VerifiedUser, Profile, Photo, FriendRequest, Relationship
-from user.permissions import IsAuthorized, IsOwner, IsBothOwner, IsBothFrOwner, \
-    IsBlockOwner
-from user.serializers import RegisterSerializer, TokenObtainPairSerializer, \
+from users.models import Profile
+from users.serializers import RegisterSerializer, TokenObtainPairSerializer, \
     ForgotPasswordSerializer, \
-    ResetPasswordSerializer, ProfileRegisterSerializer, PhotoSerializer, \
-    ProfileUpdateSerializer, UpdateUserSerializer, \
-    ChangePasswordSerializer, RequestSerializer, RequestDeleteSerializer, \
-    BlockSerializer
-from user.tokens import AccountVerificationToken, PasswordResetToken, \
+    ResetPasswordSerializer, ProfileRegisterSerializer,  ProfileUpdateSerializer,\
+    UpdateUserSerializer, \
+    ChangePasswordSerializer
+from users.tokens import AccountVerificationToken, PasswordResetToken, \
     password_reset_token
+from rest_framework.authentication import SessionAuthentication
 
 
 class TokenObtainPairView(TokenViewBase):
@@ -61,80 +55,23 @@ class UpdateUserView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class CreateProfileView(CreateAPIView):
-    model = Profile.objects.all()
-    serializer_class = ProfileRegisterSerializer
-    permission_classes = [IsAuthenticated,  # IsAuthorized
-                          ]
 
-    def post(self, request, *args, **kwargs):
-        gender = request.data['gender']
-        country = request.data['country']
-        birth_date = request.data['birth_date']
-        bio = request.data['bio']
-
-        serializer = ProfileRegisterSerializer(
-            data={"gender": gender, "country": country,
-                  "birth_date": birth_date, "bio": bio})
-        if serializer.is_valid():
-            try:
-                Profile.objects.create(user=request.user, country=country,
-                                       birth_date=birth_date, bio=bio, gender=gender)
-            except:
-                profile = Profile.objects.get(user=request.user)
-                profile.delete()
-                Profile.objects.create(user=request.user, country=country,
-                                       birth_date=birth_date, bio=bio, gender=gender)
-
-            return Response({"Profile": "Created"}, status=status.HTTP_202_ACCEPTED)
-
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
 class UpdateProfileView(APIView):
     queryset = Profile.objects.all()
     serializer_class = ProfileUpdateSerializer
 
-    def post(self, request, *args, **kwargs):
-        gender = request.data['gender']
-        country = request.data['country']
-        birth_date = request.data['birth_date']
-        bio = request.data['bio']
-
-        serializer = ProfileUpdateSerializer(data={"gender": gender, "country": country,
-                                                   "birth_date": birth_date,
-                                                   "bio": bio})
+    def put(self, request, *args, **kwargs):
+        profile = Profile.objects.get(user=request.user)
+        serializer = ProfileUpdateSerializer(profile, data=request.data, partial=True)
         if serializer.is_valid():
-            profile = Profile.objects.get(user=request.user)
-            profile.gender = gender
-            profile.country = country
-            profile.birth_date = birth_date
-            profile.bio = bio
-            profile.save()
-            return Response({"Profile": "Updated"}, status=status.HTTP_202_ACCEPTED)
+
+            serializer.save()
+
+            return Response(serializer.data, status=status.HTTP_202_ACCEPTED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-class CreatePhotoView(CreateAPIView):
-    model = Photo.objects.all()
-    serializer_class = PhotoSerializer
-    permission_classes = [IsAuthenticated,  # IsAuthorized
-                          ]
-
-    def post(self, request, *args, **kwargs):
-        photo = request.data['image']
-
-        serializer = PhotoSerializer(data={"image": photo})
-        if serializer.is_valid():
-            Photo.objects.create(user=request.user, image=photo)
-
-            return Response({"Photo": "Created"}, status=status.HTTP_202_ACCEPTED)
-
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-
 
 
 class VerifyAccountView(APIView):
@@ -144,17 +81,15 @@ class VerifyAccountView(APIView):
         account_verification_token = AccountVerificationToken()
 
         try:
-            decoded_base64 = force_text(urlsafe_base64_decode(base64))
+            decoded_base64 = force_str(urlsafe_base64_decode(base64))
             user = User.objects.get(username=decoded_base64)
         except (TypeError, ValueError, OverflowError, User.DoesNotExist):
             user = None
 
         if user is not None and account_verification_token.check_token(user, token):
-            try:
-                user.verification.delete()
-            except:
-                pass
-            VerifiedUser.objects.create(user=user)
+
+            user.verification = True
+            user.save()
             return Response({"account": "verifed"}, status=status.HTTP_202_ACCEPTED)
         else:
             return Response({"Token": "Invalid Token"},
@@ -207,7 +142,7 @@ class ResetPasswordView(APIView):
         serializer = ResetPasswordSerializer(data={"new_password": new_password})
 
         try:
-            decoded_base64 = force_text(urlsafe_base64_decode(base64))
+            decoded_base64 = force_str(urlsafe_base64_decode(base64))
             user = User.objects.get(username=decoded_base64)
 
         except (TypeError, ValueError, OverflowError, User.DoesNotExist):

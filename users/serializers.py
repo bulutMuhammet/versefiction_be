@@ -43,7 +43,8 @@ class RegisterSerializer(serializers.ModelSerializer):
         )
         user.set_password(validated_data["password"])
         user.save()
-        send_verify_mail(user=user)
+        Profile.objects.create(user=user)
+        # send_verify_mail(user=user)
 
 
         return user
@@ -127,8 +128,7 @@ class TokenObtainPairSerializer(TokenObtainSerializer):
         if api_settings.UPDATE_LAST_LOGIN:
             update_last_login(None, self.user)
 
-        ver = VerifiedUser.objects.filter(user=self.user)
-        if ver.exists():
+        if self.user.is_verified:
             return data
         else:
             raise serializers.ValidationError('Henüz hesabını onaylamadın.')
@@ -179,14 +179,14 @@ class ProfileRegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Profile
-        fields = ('gender','country','birth_date','bio')
+        fields = ('photo','gender','birth_date','bio')
 
-class ProfileUpdateSerializer(serializers.ModelSerializer,RetrieveAPIView):
+class ProfileUpdateSerializer(serializers.ModelSerializer):
     GENDER = (('e', 'Erkek'), ('k', 'Kadın'), ('d', 'Diğer'))
-    gender = serializers.ChoiceField(required=True, choices=GENDER)
+    gender = serializers.ChoiceField(required=False, choices=GENDER)
     class Meta:
         model=Profile
-        fields = ('gender','country','birth_date','bio')
+        fields = ('photo','gender','birth_date','bio')
 
 class ChangePasswordSerializer(Serializer):
     old_password = serializers.CharField(required=True)
